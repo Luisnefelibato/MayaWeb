@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: maya-python-assistant
+    env: docker
+    plan: free
+    envVars:
+      - key: OLLAMA_URL
+        value: https://evaenespanol.loca.lt
+      - key: MODEL_NAME
+        value: llama3:8b
+      - key: TTS_VOICE
+        value: es-MX-DaliaNeural
+      - key: TTS_RATE
+        value: +0%
+      - key: TTS_VOLUME
+        value: +0%
