@@ -30,8 +30,8 @@ CORS(app,
      }},
      supports_credentials=True)
 
-# Configuración de la API de Ollama - MODIFICADO PARA USAR LOCALHOST
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
+# Configuración de la API de Ollama
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "https://evaenespanol.loca.lt")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3:8b")
 
 # Configuración de voz Edge TTS
@@ -167,11 +167,11 @@ def call_ollama_api(prompt, session_id, max_retries=3):
                 except:
                     app.logger.error(f"Contenido del error: {response.text[:500]}")
                 
-                # Si falla, podemos intentar simular una respuesta para desarrollo
-                if attempt == max_retries - 1:
-                    app.logger.info("Generando respuesta simulada para desarrollo...")
-                    simulated_response = f"Esto es una respuesta simulada para desarrollo. No se pudo conectar al modelo Ollama. Tu pregunta fue: '{prompt}'"
-                    return simulated_response
+                # Si obtenemos un 403, intentar con una URL alternativa
+                if response.status_code == 403 and attempt == 0:
+                    app.logger.info("Error 403, probando URL alternativa...")
+                    alt_url = "http://127.0.0.1:11434/api/chat"
+                    response = requests.post(alt_url, headers=headers, json=data, timeout=60)
             
             response.raise_for_status()
             response_data = response.json()
@@ -191,8 +191,7 @@ def call_ollama_api(prompt, session_id, max_retries=3):
                 import time
                 time.sleep(wait_time)
             else:
-                # Generar respuesta simulada en caso de error
-                return f"Esto es una respuesta simulada para desarrollo. No se pudo conectar al modelo Ollama. Tu pregunta fue: '{prompt}'"
+                return f"Lo siento, estoy experimentando problemas técnicos de comunicación. ¿Podríamos intentarlo más tarde?"
     
     return "No se pudo conectar al servicio. Por favor, inténtelo de nuevo más tarde."
 
@@ -241,12 +240,7 @@ def call_ollama_completion(prompt, session_id, max_retries=3):
                 return response_data["response"]
             else:
                 app.logger.error(f"Formato de respuesta inesperado: {response_data}")
-                
-                # Si falla, podemos intentar simular una respuesta para desarrollo
-                if attempt == max_retries - 1:
-                    app.logger.info("Generando respuesta simulada para desarrollo...")
-                    simulated_response = f"Esto es una respuesta simulada para desarrollo. No se pudo conectar al modelo Ollama. Tu pregunta fue: '{prompt}'"
-                    return simulated_response
+                return "Lo siento, no pude generar una respuesta apropiada en este momento."
             
         except requests.exceptions.RequestException as e:
             app.logger.error(f"Error en intento {attempt+1}/{max_retries}: {str(e)}")
@@ -256,25 +250,22 @@ def call_ollama_completion(prompt, session_id, max_retries=3):
                 import time
                 time.sleep(wait_time)
             else:
-                # Generar respuesta simulada en caso de error
-                return f"Esto es una respuesta simulada para desarrollo. No se pudo conectar al modelo Ollama. Tu pregunta fue: '{prompt}'"
+                return f"Lo siento, estoy experimentando problemas técnicos de comunicación. ¿Podríamos intentarlo más tarde?"
     
     return "No se pudo conectar al servicio. Por favor, inténtelo de nuevo más tarde."
 
 async def convert_text_to_speech(text):
-    """Convertir texto a voz usando Edge TTS - CORREGIDO"""
+    """Convertir texto a voz usando Edge TTS"""
     try:
-        # Limpiar el texto para la síntesis de voz
+        # Limpiare el texto para la síntesis de voz
         cleaned_text = clean_response_for_tts(text)
         
         # Usar BytesIO para almacenar el audio en memoria
         output = BytesIO()
         
-        # Realizar la conversión de texto a voz con la API corregida
+        # Realizar la conversión de texto a voz
         communicate = edge_tts.Communicate(cleaned_text, VOICE, rate=VOICE_RATE, volume=VOICE_VOLUME)
-        
-        # La versión actual usa .save() en lugar de .stream_to_file()
-        await communicate.save(output)
+        await communicate.stream_to_file(output)
         
         # Obtener los bytes del audio
         output.seek(0)
@@ -283,17 +274,7 @@ async def convert_text_to_speech(text):
         return audio_data
     except Exception as e:
         app.logger.error(f"Error en síntesis de voz: {e}")
-        # Intento alternativo con una versión más simple para debugging
-        try:
-            app.logger.info("Intentando método alternativo de TTS...")
-            # Crear un comunicador más simple
-            communicate = edge_tts.Communicate("Hola, este es un mensaje de prueba.", VOICE)
-            await communicate.save(output)
-            output.seek(0)
-            return output.getvalue()
-        except Exception as e2:
-            app.logger.error(f"Error en método alternativo de TTS: {e2}")
-            return None
+        return None
 
 def speech_to_text(audio_data):
     """
