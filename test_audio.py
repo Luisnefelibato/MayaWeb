@@ -72,7 +72,7 @@ def test_transcribe(audio_file, server_url="http://localhost:5000"):
         print(response.text)
         return None
 
-def test_voice_chat(audio_file, session_id="test_session", server_url="http://localhost:5000"):
+def test_voice_chat(audio_file, session_id="test_session", server_url="https://mayaweb.onrender.com"):
     """
     Prueba el endpoint /voice-chat enviando un archivo de audio.
     
@@ -114,7 +114,7 @@ def main():
     """Función principal para probar los endpoints de audio."""
     server_url = input("URL del servidor (dejar en blanco para localhost:5000): ").strip()
     if not server_url:
-        server_url = "http://localhost:5000"
+        server_url = "https://mayaweb.onrender.com"
     
     while True:
         print("\nOpciones:")

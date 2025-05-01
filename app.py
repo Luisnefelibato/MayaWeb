@@ -11,7 +11,25 @@ from io import BytesIO
 import tempfile
 
 app = Flask(__name__)
-CORS(app)
+
+# Configuración extendida de CORS para permitir solicitudes desde diferentes orígenes
+CORS(app, 
+     resources={r"/*": {
+         "origins": [
+             "http://localhost:5173",          # URL de desarrollo Vite
+             "http://localhost:3000",          # URL desarrollo alternativa
+             "http://localhost:*",             # Cualquier puerto local
+             "https://*.netlify.app",          # Despliegues en Netlify
+             "https://*.vercel.app",           # Despliegues en Vercel
+             "https://mayafrontend.web.app",   # Ejemplo para Firebase
+             "https://mayafrontend.firebaseapp.com", # Firebase app
+             "*"                               # Permitir todos los orígenes en desarrollo
+         ],
+         "methods": ["GET", "POST", "OPTIONS"],
+         "allow_headers": ["Content-Type", "Authorization"]
+     }},
+     supports_credentials=True)
+
 # Configuración de la API de Ollama
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "https://evaenespanol.loca.lt")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llama3:8b")
@@ -406,9 +424,14 @@ def speak():
             "session_id": session_id
         }), 500
 
-@app.route('/transcribe', methods=['POST'])
+@app.route('/transcribe', methods=['POST', 'OPTIONS'])
 def transcribe_audio():
     """Endpoint para transcribir audio a texto"""
+    # Manejar solicitudes OPTIONS (pre-flight)
+    if request.method == 'OPTIONS':
+        response = jsonify({"status": "ok"})
+        return response
+    
     # Verificar si hay un archivo en la solicitud
     if 'audio' not in request.files:
         return jsonify({"error": "No se proporcionó archivo de audio"}), 400
@@ -425,9 +448,14 @@ def transcribe_audio():
         "text": text
     })
 
-@app.route('/voice-chat', methods=['POST'])
+@app.route('/voice-chat', methods=['POST', 'OPTIONS'])
 def voice_chat():
     """Endpoint para interactuar con el asistente usando voz y recibir audio"""
+    # Manejar solicitudes OPTIONS (pre-flight)
+    if request.method == 'OPTIONS':
+        response = jsonify({"status": "ok"})
+        return response
+    
     # Verificar si hay un archivo en la solicitud
     if 'audio' not in request.files:
         return jsonify({"error": "No se proporcionó archivo de audio"}), 400
@@ -491,9 +519,14 @@ def voice_chat():
             "session_id": session_id
         }), 500
 
-@app.route('/reset', methods=['POST'])
+@app.route('/reset', methods=['POST', 'OPTIONS'])
 def reset_session():
     """Reiniciar una sesión de conversación"""
+    # Manejar solicitudes OPTIONS (pre-flight)
+    if request.method == 'OPTIONS':
+        response = jsonify({"status": "ok"})
+        return response
+    
     data = request.json or {}
     session_id = data.get('session_id', 'default')
     
@@ -571,6 +604,15 @@ async def async_list_voices():
     except Exception as e:
         app.logger.error(f"Error al listar voces: {e}")
         return {"error": "No se pudieron obtener las voces", "voices": []}
+
+# Middleware personalizado para mejorar manejo de CORS
+@app.after_request
+def after_request(response):
+    """Middleware para asegurar encabezados CORS en cada respuesta"""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
 
 if __name__ == '__main__':
     # Obtener puerto de variables de entorno (para Render)
